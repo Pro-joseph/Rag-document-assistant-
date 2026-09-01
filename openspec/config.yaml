@@ -6,6 +6,7 @@ context: |
   Domain: RAG Document Assistant - ingest PDF/DOCX/TXT/CSV, chunk (~800 chars, 150 overlap, split on \n\n/\n/. /space), embed, vector search cosine via pgvector <=>, grounded generation with citations, no hallucination.
   Constraints: File max 20MB, status pending->processing->ready/failed, queue worker separate container, keys in env not hardcoded, no multi-user auth v1, no persistent chat history v1.
 
+
 rules:
   proposal:
     - "Keep under 500 words, include Why/Scope/Non-goals"
