@@ -1,0 +1,18 @@
+schema: spec-driven
+
+context: |
+  Tech stack: Laravel 13 (PHP 8.3) API + Next.js 15 App Router + Tailwind, PostgreSQL + pgvector, OpenAI text-embedding-3-small (1536 dims), Groq Llama 3.3 70b, Laravel Queues (DB/Redis), Docker, Terraform, EC2/RDS.
+  Conventions: Laravel best practices - thin controllers, FormRequests for validation, Service layer (SRP), Jobs for async, API Resources for responses, DI via service container, Eloquent models. Separate responsibilities strictly.
+  Domain: RAG Document Assistant - ingest PDF/DOCX/TXT/CSV, chunk (~800 chars, 150 overlap, split on \n\n/\n/. /space), embed, vector search cosine via pgvector <=>, grounded generation with citations, no hallucination.
+  Constraints: File max 20MB, status pending->processing->ready/failed, queue worker separate container, keys in env not hardcoded, no multi-user auth v1, no persistent chat history v1.
+
+rules:
+  proposal:
+    - "Keep under 500 words, include Why/Scope/Non-goals"
+  design:
+    - "Enforce SRP separation - Requests/Services/Jobs/Controllers/Resources"
+    - "Reference best practices explicitly"
+  specs:
+    - "Use SHALL/MUST, include Given/When/Then scenarios"
+  tasks:
+    - "Break into <2h chunks, ordered by build dependency, include verification steps"
