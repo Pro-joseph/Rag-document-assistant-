@@ -2,6 +2,7 @@
 
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Tests\Support\DocumentFixtures;
 
 test('a file can be uploaded to the documents directory', function () {
     Storage::fake('public');
@@ -22,27 +23,35 @@ test('a file can be uploaded to the documents directory', function () {
 test('a pdf file can be uploaded', function () {
     Storage::fake('public');
 
+    $path = DocumentFixtures::pdfPath('Hello World from PDF');
+
     $response = $this->postJson('/upload', [
-        'file' => UploadedFile::fake()->create('document.pdf', 100, 'application/pdf'),
+        'file' => new UploadedFile($path, 'document.pdf', 'application/pdf', null, true),
     ]);
 
     $response->assertOk()
         ->assertJson([
             'status' => 'success',
         ]);
+
+    DocumentFixtures::cleanup($path);
 });
 
 test('a docx file can be uploaded', function () {
     Storage::fake('public');
 
+    $path = DocumentFixtures::docxPath('Hello from DOCX test document');
+
     $response = $this->postJson('/upload', [
-        'file' => UploadedFile::fake()->create('document.docx', 100, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'),
+        'file' => new UploadedFile($path, 'document.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', null, true),
     ]);
 
     $response->assertOk()
         ->assertJson([
             'status' => 'success',
         ]);
+
+    DocumentFixtures::cleanup($path);
 });
 
 test('the upload endpoint validates that a file is provided', function () {

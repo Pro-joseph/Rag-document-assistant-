@@ -2,27 +2,57 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\DocumentType;
+use App\Services\DocumentParser;
+use App\Services\DocumentTypeDetector;
+use App\Services\ParsingException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class FileUploadController extends Controller
 {
+    public function __construct(
+        private readonly DocumentTypeDetector $documentTypeDetector,
+        private readonly DocumentParser $documentParser,
+    ) {}
+
     public function store(Request $request): JsonResponse
     {
-        $request->validate([
-            'file' => ['required', 'file', 'mimes:pdf,docx,txt,csv', 'max:10240'],
+        $validated = $request->validate([
+            'file' => ['required', 'file', 'max:10240'],
         ]);
 
-        $path = $request->file('file')->store('documents', 'public');
+        $file = $validated['file'];
+        $documentType = $this->documentTypeDetector->detect($file);
+
+        if ($documentType === DocumentType::Unknown) {
+            throw ValidationException::withMessages([
+                'file' => 'The file must be a supported document (pdf, docx, txt, csv).',
+            ]);
+        }
+
+        $path = $file->store('documents', 'public');
 
         if (! Str::startsWith($path, 'documents/')) {
             abort(422, 'Invalid file path.');
         }
 
+        try {
+            $extractedContent = $this->documentParser->parse($file);
+        } catch (ParsingException $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $e->getMessage(),
+            ], 422);
+        }
+
         return response()->json([
             'status' => 'success',
             'path' => $path,
+            'type' => $documentType->value,
+            'content' => $extractedContent,
         ]);
     }
 }
