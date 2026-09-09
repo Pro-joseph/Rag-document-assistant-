@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Storage;
 use Tests\Support\DocumentFixtures;
 
 test('upload returns document type and parsed content for txt', function () {
-    Storage::fake('public');
+    Storage::fake('local');
 
     $response = $this->postJson('/upload', [
         'file' => UploadedFile::fake()->createWithContent('sample.txt', 'Hello world from txt'),
@@ -22,7 +22,7 @@ test('upload returns document type and parsed content for txt', function () {
 });
 
 test('upload stores the file and returns the correct path', function () {
-    Storage::fake('public');
+    Storage::fake('local');
 
     $response = $this->postJson('/upload', [
         'file' => UploadedFile::fake()->createWithContent('report.txt', 'report content'),
@@ -30,11 +30,11 @@ test('upload stores the file and returns the correct path', function () {
 
     $response->assertOk();
 
-    Storage::disk('public')->assertExists($response->json('path'));
+    Storage::disk('local')->assertExists($response->json('path'));
 });
 
 test('upload returns document type and parsed content for csv', function () {
-    Storage::fake('public');
+    Storage::fake('local');
 
     $csvContent = "Name,Age\nAlice,20\nBob,22";
 
@@ -54,7 +54,7 @@ test('upload returns document type and parsed content for csv', function () {
 });
 
 test('upload returns parsed content for a real pdf', function () {
-    Storage::fake('public');
+    Storage::fake('local');
 
     $path = DocumentFixtures::pdfPath('Hello World from PDF');
     $file = new UploadedFile($path, 'document.pdf', 'application/pdf', null, true);
@@ -75,7 +75,7 @@ test('upload returns parsed content for a real pdf', function () {
 });
 
 test('upload returns parsed content for a real docx', function () {
-    Storage::fake('public');
+    Storage::fake('local');
 
     $path = DocumentFixtures::docxPath('Hello from DOCX test document');
     $file = new UploadedFile($path, 'document.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', null, true);
@@ -96,7 +96,7 @@ test('upload returns parsed content for a real docx', function () {
 });
 
 test('upload handles parsing failure gracefully and logs details', function () {
-    Storage::fake('public');
+    Storage::fake('local');
     Log::spy();
 
     $response = $this->postJson('/upload', [
@@ -116,8 +116,18 @@ test('upload handles parsing failure gracefully and logs details', function () {
         });
 });
 
+test('failed parses do not leave orphaned files in storage', function () {
+    Storage::fake('local');
+
+    $this->postJson('/upload', [
+        'file' => UploadedFile::fake()->createWithContent('corrupt.pdf', 'not a real pdf'),
+    ])->assertStatus(422);
+
+    Storage::disk('local')->assertDirectoryEmpty('documents');
+});
+
 test('upload does not expose exception details to the user', function () {
-    Storage::fake('public');
+    Storage::fake('local');
 
     $response = $this->postJson('/upload', [
         'file' => UploadedFile::fake()->createWithContent('corrupt.pdf', 'not a real pdf'),
@@ -141,4 +151,35 @@ test('existing upload validation still rejects oversized files', function () {
     $this->postJson('/upload', [
         'file' => UploadedFile::fake()->create('big.bin', 11 * 1024),
     ])->assertStatus(422);
+});
+
+test('uploads whose extracted text exceeds the limit are rejected', function () {
+    Storage::fake('local');
+    config()->set('rag.max_extracted_characters', 10);
+
+    $response = $this->postJson('/upload', [
+        'file' => UploadedFile::fake()->createWithContent('big.txt', str_repeat('a', 11)),
+    ]);
+
+    $response->assertStatus(422)
+        ->assertJson([
+            'status' => 'error',
+        ])
+        ->assertJsonPath('message', 'The document contains too much text to process at once. Please upload a smaller document.');
+
+    Storage::disk('local')->assertDirectoryEmpty('documents');
+});
+
+test('upload endpoint is rate limited', function () {
+    Storage::fake('local');
+
+    for ($i = 0; $i < 10; $i++) {
+        $this->postJson('/upload', [
+            'file' => UploadedFile::fake()->createWithContent('tiny.txt', 'content '.$i),
+        ])->assertOk();
+    }
+
+    $this->postJson('/upload', [
+        'file' => UploadedFile::fake()->createWithContent('tiny.txt', 'too many'),
+    ])->assertStatus(429);
 });

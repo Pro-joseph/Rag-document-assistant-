@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\DocumentType;
+use App\Services\DocumentChunker;
 use App\Services\DocumentParser;
 use App\Services\DocumentTypeDetector;
 use App\Services\ParsingException;
@@ -16,6 +17,7 @@ class FileUploadController extends Controller
     public function __construct(
         private readonly DocumentTypeDetector $documentTypeDetector,
         private readonly DocumentParser $documentParser,
+        private readonly DocumentChunker $documentChunker,
     ) {}
 
     public function store(Request $request): JsonResponse
@@ -33,12 +35,6 @@ class FileUploadController extends Controller
             ]);
         }
 
-        $path = $file->store('documents', 'public');
-
-        if (! Str::startsWith($path, 'documents/')) {
-            abort(422, 'Invalid file path.');
-        }
-
         try {
             $extractedContent = $this->documentParser->parse($file);
         } catch (ParsingException $e) {
@@ -48,11 +44,18 @@ class FileUploadController extends Controller
             ], 422);
         }
 
+        $path = $file->store('documents', 'local');
+
+        if (! Str::startsWith($path, 'documents/')) {
+            abort(422, 'Invalid file path.');
+        }
+
         return response()->json([
             'status' => 'success',
             'path' => $path,
             'type' => $documentType->value,
             'content' => $extractedContent,
+            'chunks' => $this->documentChunker->chunk($extractedContent),
         ]);
     }
 }

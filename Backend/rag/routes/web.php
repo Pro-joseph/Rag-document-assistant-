@@ -7,4 +7,5 @@ Route::get('/', function () {
     return view('welcome');
 });
 
-Route::post('/upload', [FileUploadController::class, 'store']);
+Route::post('/upload', [FileUploadController::class, 'store'])
+    ->middleware('throttle:10,1');

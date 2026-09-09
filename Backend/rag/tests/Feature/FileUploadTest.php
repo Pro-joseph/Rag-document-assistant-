@@ -5,7 +5,7 @@ use Illuminate\Support\Facades\Storage;
 use Tests\Support\DocumentFixtures;
 
 test('a file can be uploaded to the documents directory', function () {
-    Storage::fake('public');
+    Storage::fake('local');
 
     $response = $this->postJson('/upload', [
         'file' => UploadedFile::fake()->create('document.txt', 100),
@@ -17,11 +17,11 @@ test('a file can be uploaded to the documents directory', function () {
         ])
         ->assertJsonStructure(['path']);
 
-    Storage::disk('public')->assertExists($response->json('path'));
+    Storage::disk('local')->assertExists($response->json('path'));
 });
 
 test('a pdf file can be uploaded', function () {
-    Storage::fake('public');
+    Storage::fake('local');
 
     $path = DocumentFixtures::pdfPath('Hello World from PDF');
 
@@ -38,7 +38,7 @@ test('a pdf file can be uploaded', function () {
 });
 
 test('a docx file can be uploaded', function () {
-    Storage::fake('public');
+    Storage::fake('local');
 
     $path = DocumentFixtures::docxPath('Hello from DOCX test document');
 

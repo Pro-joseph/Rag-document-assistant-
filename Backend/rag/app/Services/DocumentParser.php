@@ -8,7 +8,12 @@ use Illuminate\Support\Facades\Log;
 
 class DocumentParser
 {
-    public function __construct(private readonly DocumentTypeDetector $detector) {}
+    public const DEFAULT_MAX_EXTRACTED_CHARACTERS = 5_000_000;
+
+    public function __construct(
+        private readonly DocumentTypeDetector $detector,
+        private readonly int $maxExtractedCharacters = self::DEFAULT_MAX_EXTRACTED_CHARACTERS,
+    ) {}
 
     public function parse(UploadedFile $file): string
     {
@@ -28,7 +33,7 @@ class DocumentParser
         $parser = new $parserClass;
 
         try {
-            return $parser->parse($file);
+            $text = $parser->parse($file);
         } catch (\Throwable $e) {
             Log::error('Document parsing failed', [
                 'file' => $this->normalizeForLog($file->getClientOriginalName()),
@@ -39,6 +44,12 @@ class DocumentParser
 
             throw new ParsingException('The document could not be parsed. Please check the file and try again.', previous: $e);
         }
+
+        if (mb_strlen($text) > $this->maxExtractedCharacters) {
+            throw new ParsingException('The document contains too much text to process at once. Please upload a smaller document.');
+        }
+
+        return $text;
     }
 
     private function normalizeForLog(string $value): string
