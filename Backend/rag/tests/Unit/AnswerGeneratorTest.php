@@ -1,10 +1,15 @@
 <?php
 
+use App\Exceptions\GroqUnavailableException;
 use App\Services\AnswerGenerator;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 uses(TestCase::class);
+
+beforeEach(function () {
+    config()->set('services.groq.key', 'test-groq-key');
+});
 
 function groqResponse(string $content): array
 {
@@ -58,4 +63,33 @@ test('uses configured groq model and temperature', function () {
         return $request->data()['model'] === 'llama-3.3-70b-versatile'
             && $request->data()['temperature'] === 0.2;
     });
+});
+
+test('groq failure throws with sources preserved', function () {
+    Http::fake([
+        'api.groq.com/*' => Http::response(['error' => 'overloaded'], 500),
+    ]);
+
+    $hits = [(object) ['content' => 'X is Y', 'filename' => 'doc.pdf', 'score' => 0.9]];
+
+    try {
+        app(AnswerGenerator::class)->generate('What is X?', $hits);
+        expect(false)->toBeTrue('Expected GroqUnavailableException');
+    } catch (GroqUnavailableException $e) {
+        expect($e->sources)->toHaveCount(1);
+    }
+});
+
+test('missing api key throws without http call', function () {
+    config()->set('services.groq.key', '');
+    Http::fake();
+
+    try {
+        app(AnswerGenerator::class)->generate('Q?', []);
+        expect(false)->toBeTrue('Expected GroqUnavailableException');
+    } catch (GroqUnavailableException $e) {
+        expect(true)->toBeTrue();
+    }
+
+    Http::assertNothingSent();
 });
