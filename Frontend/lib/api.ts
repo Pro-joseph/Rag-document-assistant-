@@ -5,6 +5,7 @@ export interface DocumentItem {
   filename: string;
   status: 'pending' | 'processing' | 'ready' | 'failed';
   created_at: string;
+  updated_at: string;
 }
 
 export interface Source {

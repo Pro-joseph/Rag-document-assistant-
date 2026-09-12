@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['filename', 'status'])]
+#[Fillable(['filename', 'status', 'storage_path'])]
 class Document extends Model
 {
     /** @use HasFactory<Document> */
