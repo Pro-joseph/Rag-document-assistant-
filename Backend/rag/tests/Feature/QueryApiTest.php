@@ -77,3 +77,19 @@ test('embedding failure during search returns 503', function () {
     $response->assertStatus(503)
         ->assertJsonPath('code', 'groq_unavailable');
 });
+
+test('unrelated question with indexed doc returns do not know without hallucination', function () {
+    $doc = Document::create(['filename' => 'weather.pdf', 'status' => 'ready']);
+    $doc->chunks()->create(['chunk_index' => 0, 'content' => 'weather is sunny']);
+
+    Http::fake([
+        'api.openai.com/*' => Http::response(['data' => [['embedding' => array_fill(0, 1536, 0.9)]]], 200),
+        'api.groq.com/*' => Http::response(['choices' => [['message' => ['content' => "I don't know"]]]], 200),
+    ]);
+
+    $response = $this->postJson('/api/query', ['question' => 'What is revenue?']);
+
+    $response->assertOk()
+        ->assertJsonPath('answer', "I don't know")
+        ->assertJsonStructure(['answer', 'sources']);
+});

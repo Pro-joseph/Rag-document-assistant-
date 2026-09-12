@@ -26,7 +26,7 @@ class AnswerGenerator
             ->implode("\n\n");
 
         $prompt = $context !== ''
-            ? "Context:\n{$context}\n\nQuestion: {$question}\n\nAnswer using only the context above, citing [source] numbers."
+            ? "Context:\n{$context}\n\nQuestion: {$question}\n\nAnswer using only the context above, citing [n] numbers."
             : "No documents ingested yet.\n\nQuestion: {$question}";
 
         try {
