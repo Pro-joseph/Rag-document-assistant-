@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\DocumentType;
+use App\Rules\SupportedDocumentFile;
 use App\Services\DocumentChunker;
 use App\Services\DocumentParser;
 use App\Services\DocumentTypeDetector;
@@ -23,7 +24,7 @@ class FileUploadController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'file' => ['required', 'file', 'mimes:pdf,docx,txt,csv', 'max:20480'],
+            'file' => ['required', 'file', new SupportedDocumentFile, 'max:20480'],
         ]);
 
         $file = $validated['file'];

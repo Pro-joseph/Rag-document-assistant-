@@ -1,11 +1,15 @@
 ## ADDED Requirements
 
 ### Requirement: Upload validates and dispatches ingestion
-The system SHALL expose `POST /api/documents` accepting `multipart/form-data` with field `file`. Validation SHALL be in `StoreDocumentRequest` with rules `required|file|mimes:pdf,docx,txt,csv|max:20480`. On success SHALL store file to `uploads` disk, create `Document` with `filename=originalName` and `status=pending`, dispatch `IngestDocument` job, and return `DocumentResource` with HTTP 202 containing `id,filename,status`.
+The system SHALL expose `POST /api/documents` accepting `multipart/form-data` with field `file`. Validation SHALL be in `StoreDocumentRequest` with rules `required|file|max:20480` plus the `SupportedDocumentFile` rule (accepts pdf/docx/txt/csv by content sniffing, falling back to extension plus `DocumentTypeDetector` mime/extension/zip-signature check when the server fileinfo database cannot identify the content, e.g. valid docx reported as `application/octet-stream`; same message as the former `mimes:pdf,docx,txt,csv` rule). On success SHALL store file to `uploads` disk, create `Document` with `filename=originalName` and `status=pending`, dispatch `IngestDocument` job, and return `DocumentResource` with HTTP 202 containing `id,filename,status`.
 
 #### Scenario: Valid PDF upload returns 202
 - **WHEN** client POSTs a 1MB `sample.pdf` with `mimes pdf`
 - **THEN** response is 202 with `status pending` and job is queued
+
+#### Scenario: Valid docx accepted despite limited fileinfo database
+- **WHEN** client POSTs a real `.docx` whose content the server sniffs as `application/octet-stream`
+- **THEN** response is not 422 for `file` when the extension is docx and the archive contains `word/document.xml`
 
 #### Scenario: Invalid mime rejected
 - **WHEN** client POSTs `image.png` or `exe` file

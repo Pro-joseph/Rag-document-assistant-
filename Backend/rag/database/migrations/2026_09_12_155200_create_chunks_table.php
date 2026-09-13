@@ -21,7 +21,8 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        if (DB::getDriverName() === 'pgsql') {
+        if (DB::getDriverName() === 'pgsql' && self::pgvectorAvailable()) {
+            DB::statement('CREATE EXTENSION IF NOT EXISTS vector');
             DB::statement('ALTER TABLE chunks ALTER COLUMN embedding TYPE vector(1536) USING embedding::vector(1536)');
             DB::statement('CREATE INDEX IF NOT EXISTS chunks_embedding_idx ON chunks USING ivfflat (embedding vector_cosine_ops)');
         }
@@ -32,6 +33,21 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (DB::getDriverName() === 'pgsql' && self::pgvectorAvailable()) {
+            DB::statement('DROP INDEX IF EXISTS chunks_embedding_idx');
+        }
+
         Schema::dropIfExists('chunks');
+    }
+
+    private static function pgvectorAvailable(): bool
+    {
+        try {
+            return DB::selectOne(
+                "SELECT 1 AS ok FROM pg_available_extensions WHERE name = 'vector'"
+            ) !== null;
+        } catch (\Throwable) {
+            return false;
+        }
     }
 };

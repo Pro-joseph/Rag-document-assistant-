@@ -25,7 +25,7 @@ class Retriever
         $queryVector = $vectors[0];
         $literal = '['.implode(',', $queryVector).']';
 
-        if (DB::getDriverName() === 'pgsql') {
+        if (PgVector::available()) {
             return DB::select(
                 'SELECT chunks.content, documents.filename, 1 - (chunks.embedding <=> ?::vector) AS score
                  FROM chunks
@@ -38,10 +38,29 @@ class Retriever
 
         $rows = DB::table('chunks')
             ->join('documents', 'documents.id', '=', 'chunks.document_id')
-            ->select('chunks.content', 'documents.filename')
-            ->limit($topK)
+            ->select('chunks.content', 'chunks.embedding', 'documents.filename')
             ->get();
 
-        return $rows->map(fn ($r) => (object) ['content' => $r->content, 'filename' => $r->filename, 'score' => 1.0])->all();
+        $scored = [];
+        $hasVectors = false;
+
+        foreach ($rows as $row) {
+            $stored = is_string($row->embedding) ? json_decode($row->embedding, true) : null;
+
+            if (is_array($stored) && $stored !== []) {
+                $hasVectors = true;
+                $score = PgVector::cosine($queryVector, array_map(floatval(...), $stored));
+            } else {
+                $score = 1.0;
+            }
+
+            $scored[] = (object) ['content' => $row->content, 'filename' => $row->filename, 'score' => $score];
+        }
+
+        if ($hasVectors) {
+            usort($scored, fn ($a, $b) => $b->score <=> $a->score);
+        }
+
+        return array_slice($scored, 0, $topK);
     }
 }
