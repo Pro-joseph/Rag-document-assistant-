@@ -4,9 +4,9 @@ namespace App\Jobs;
 
 use App\Models\Document;
 use App\Services\EmbeddingService;
+use App\Services\VectorStore;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -22,8 +22,10 @@ class IngestDocument implements ShouldQueue
         public array $chunks = [],
     ) {}
 
-    public function handle(EmbeddingService $embedder): void
+    public function handle(EmbeddingService $embedder, ?VectorStore $vectorStore = null): void
     {
+        $vectorStore ??= app(VectorStore::class);
+
         $this->document->update(['status' => 'processing']);
 
         try {
@@ -35,28 +37,7 @@ class IngestDocument implements ShouldQueue
 
             $vectors = $embedder->embed($this->chunks);
 
-            foreach ($this->chunks as $i => $content) {
-                if (! isset($vectors[$i]) || count($vectors[$i]) !== 1536) {
-                    throw new \RuntimeException('Invalid embedding dimension.');
-                }
-
-                if (DB::getDriverName() === 'pgsql') {
-                    $literal = '['.implode(',', $vectors[$i]).']';
-                    DB::statement(
-                        'INSERT INTO chunks (document_id, chunk_index, content, embedding, created_at, updated_at) VALUES (?, ?, ?, ?::vector, now(), now())',
-                        [$this->document->id, $i, $content, $literal]
-                    );
-                } else {
-                    DB::table('chunks')->insert([
-                        'document_id' => $this->document->id,
-                        'chunk_index' => $i,
-                        'content' => $content,
-                        'embedding' => json_encode($vectors[$i]),
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ]);
-                }
-            }
+            $vectorStore->store($this->document, $this->chunks, $vectors);
 
             $this->document->update(['status' => 'ready']);
         } catch (Throwable $e) {

@@ -2,11 +2,12 @@
 
 namespace App\Services;
 
-use Illuminate\Support\Facades\DB;
-
 class Retriever
 {
-    public function __construct(private EmbeddingService $embedder) {}
+    public function __construct(
+        private EmbeddingService $embedder,
+        private ?VectorStore $vectorStore = null,
+    ) {}
 
     /**
      * Search for semantically similar chunks (US-21/22/23).
@@ -22,26 +23,14 @@ class Retriever
             return [];
         }
 
-        $queryVector = $vectors[0];
-        $literal = '['.implode(',', $queryVector).']';
+        $vectorStore = $this->vectorStore ?? app(VectorStore::class);
 
-        if (DB::getDriverName() === 'pgsql') {
-            return DB::select(
-                'SELECT chunks.content, documents.filename, 1 - (chunks.embedding <=> ?::vector) AS score
-                 FROM chunks
-                 JOIN documents ON documents.id = chunks.document_id
-                 ORDER BY chunks.embedding <=> ?::vector
-                 LIMIT ?',
-                [$literal, $literal, $topK]
-            );
-        }
-
-        $rows = DB::table('chunks')
-            ->join('documents', 'documents.id', '=', 'chunks.document_id')
-            ->select('chunks.content', 'documents.filename')
-            ->limit($topK)
-            ->get();
-
-        return $rows->map(fn ($r) => (object) ['content' => $r->content, 'filename' => $r->filename, 'score' => 1.0])->all();
+        return $vectorStore->nearest($vectors[0], $topK)
+            ->map(fn ($hit) => (object) [
+                'content' => $hit->content,
+                'filename' => $hit->filename,
+                'score' => $hit->score,
+            ])
+            ->all();
     }
 }

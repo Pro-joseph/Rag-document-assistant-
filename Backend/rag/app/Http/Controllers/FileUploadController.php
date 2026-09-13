@@ -23,7 +23,7 @@ class FileUploadController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'file' => ['required', 'file', 'mimes:pdf,docx,txt,csv', 'max:20480'],
+            'file' => ['required', 'file', 'max:20480'],
         ]);
 
         $file = $validated['file'];
