@@ -2,11 +2,12 @@
 
 namespace App\Services;
 
-use Illuminate\Support\Facades\DB;
-
 class Retriever
 {
-    public function __construct(private EmbeddingService $embedder) {}
+    public function __construct(
+        private EmbeddingService $embedder,
+        private ?VectorStore $vectorStore = null,
+    ) {}
 
     /**
      * Search for semantically similar chunks (US-21/22/23).
