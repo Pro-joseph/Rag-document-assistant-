@@ -11,7 +11,7 @@ export default function Home(): React.JSX.Element {
   return (
     <main>
       <h1>Documents</h1>
-      <UploadForm onUploaded={() => setRefreshKey((key) => key + 1)} />
+      <UploadForm onUploaded={() => setRefreshKey((key: number) => key + 1)} />
       <DocumentList refreshKey={refreshKey} />
       <Link href="/chat">Go to chat</Link>
     </main>
