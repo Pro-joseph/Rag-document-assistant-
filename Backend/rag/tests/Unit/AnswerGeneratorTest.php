@@ -60,7 +60,7 @@ test('uses configured groq model and temperature', function () {
     app(AnswerGenerator::class)->generate('Q?', []);
 
     Http::assertSent(function ($request) {
-        return $request->data()['model'] === 'llama-3.3-70b-versatile'
+        return $request->data()['model'] === config('services.groq.model')
             && $request->data()['temperature'] === 0.2;
     });
 });

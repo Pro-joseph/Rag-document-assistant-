@@ -23,14 +23,45 @@ class Retriever
             return [];
         }
 
-        $vectorStore = $this->vectorStore ?? app(VectorStore::class);
+        $queryVector = $vectors[0];
+        $literal = '['.implode(',', $queryVector).']';
 
-        return $vectorStore->nearest($vectors[0], $topK)
-            ->map(fn ($hit) => (object) [
-                'content' => $hit->content,
-                'filename' => $hit->filename,
-                'score' => $hit->score,
-            ])
-            ->all();
+        if (PgVector::available()) {
+            return DB::select(
+                'SELECT chunks.content, documents.filename, 1 - (chunks.embedding <=> ?::vector) AS score
+                 FROM chunks
+                 JOIN documents ON documents.id = chunks.document_id
+                 ORDER BY chunks.embedding <=> ?::vector
+                 LIMIT ?',
+                [$literal, $literal, $topK]
+            );
+        }
+
+        $rows = DB::table('chunks')
+            ->join('documents', 'documents.id', '=', 'chunks.document_id')
+            ->select('chunks.content', 'chunks.embedding', 'documents.filename')
+            ->get();
+
+        $scored = [];
+        $hasVectors = false;
+
+        foreach ($rows as $row) {
+            $stored = is_string($row->embedding) ? json_decode($row->embedding, true) : null;
+
+            if (is_array($stored) && $stored !== []) {
+                $hasVectors = true;
+                $score = PgVector::cosine($queryVector, array_map(floatval(...), $stored));
+            } else {
+                $score = 1.0;
+            }
+
+            $scored[] = (object) ['content' => $row->content, 'filename' => $row->filename, 'score' => $score];
+        }
+
+        if ($hasVectors) {
+            usort($scored, fn ($a, $b) => $b->score <=> $a->score);
+        }
+
+        return array_slice($scored, 0, $topK);
     }
 }
